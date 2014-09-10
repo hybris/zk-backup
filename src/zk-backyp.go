@@ -104,7 +104,7 @@ func stopZookeeper() error {
 		return err
 	}
 
-	timeout := 10 // Seconds
+	timeout := 60 // Seconds
 	zk_running := true
 	for zk_running && timeout > 0 && err == nil {
 		var out []byte
@@ -144,7 +144,7 @@ func startZookeeper() error {
 		return err
 	}
 
-	timeout := 10 // seconds
+	timeout := 60 // seconds
 	zk_running := false
 	for zk_running == false && timeout > 0 && err == nil {
 		var out []byte
