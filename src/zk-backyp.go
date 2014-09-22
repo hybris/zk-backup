@@ -21,6 +21,7 @@ func main() {
 	s3_endpoint := os.Getenv("ZK_BACKYP_S3_ENDPOINT")
 	zk_txlog_path := os.Getenv("ZK_TXLOG_PATH")
 	zk_snapshot_path := os.Getenv("ZK_SNAPSHOT_PATH")
+	do_cleanup := os.Getenv("ZK_BACKYP_DOCLEANUP")
 
 	// DEFINING AWS REGION
 	var region = aws.Region{}
@@ -39,7 +40,7 @@ func main() {
 
 	// execute one backup now
 	archivefilename := os.Getenv("ZK_BACKYP_PREFIX") + "-" + time.Now().Format("20060102T150424") + ".tar.gz"
-	go executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region)
+	go executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region, do_cleanup)
 
 	// execute the others later by interval
 	go func() {
@@ -47,7 +48,7 @@ func main() {
 			select {
 			case <-ticker.C:
 				archivefilename := os.Getenv("ZK_BACKYP_PREFIX") + "-" + time.Now().Format("20060102T150424") + ".tar.gz"
-				executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region)
+				executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region, do_cleanup)
 
 			case <-quit:
 				ticker.Stop()
@@ -58,10 +59,20 @@ func main() {
 	select {} // block forever
 }
 
-func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilename string, s3_bucket string, region aws.Region) {
+func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilename string, s3_bucket string, region aws.Region, cleanup) {
+	var err = nil
+	if cleanup {
+		log.Println("Cleaning up")
+		err := doCleanup(zk_txlog_path, zk_snapshot_path)
+
+		if err= nil {
+			log.Fatal(err)
+		}
+	}
+
 	log.Println("Executing Backup")
 	// STOPPING ZOOKEEPER
-	err := stopZookeeper()
+	err = stopZookeeper()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -94,6 +105,10 @@ func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilenam
 	}
 
 	log.Println("Backup successfully done")
+}
+
+func doCleanup(zk_txlog_path, zk_snapshot_path) error {
+	err := exec.Command("zkcleanup.sh", zk_txlog_path, zk_snapshot_path, 3).Run()
 }
 
 func stopZookeeper() error {
