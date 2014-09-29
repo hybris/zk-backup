@@ -6,4 +6,4 @@ go get github.com/mitchellh/goamz/aws
 go get github.com/mitchellh/goamz/s3
 
 go build -o bin/zk-backyp src/zk-backyp.go
-cp src/zk-backyp.sh bin/zk-backyp.sh
+cp src/zk-cleanup.sh bin/zk-cleanup.sh
