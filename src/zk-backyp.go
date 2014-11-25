@@ -20,9 +20,7 @@ func main() {
 	s3_bucket := os.Getenv("ZK_BACKYP_S3_BUCKET")
 	s3_endpoint := os.Getenv("ZK_BACKYP_S3_ENDPOINT")
 	zk_txlog_path := os.Getenv("ZK_TXLOG_PATH")
-	zk_keep_n_snapshots := os.Getenv("ZK_KEEP_N_SNAPSHOTS")
 	zk_snapshot_path := os.Getenv("ZK_SNAPSHOT_PATH")
-	do_cleanup := os.Getenv("ZK_BACKYP_DOCLEANUP") == "true" || os.Getenv("ZK_BACKYP_DOCLEANUP") == "TRUE"
 
 	// DEFINING AWS REGION
 	var region = aws.Region{}
@@ -41,7 +39,7 @@ func main() {
 
 	// execute one backup now
 	archivefilename := os.Getenv("ZK_BACKYP_PREFIX") + "-" + time.Now().Format("20060102T150424") + ".tar.gz"
-	go executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region, do_cleanup, zk_keep_n_snapshots)
+	go executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region)
 
 	// execute the others later by interval
 	go func() {
@@ -49,7 +47,7 @@ func main() {
 			select {
 			case <-ticker.C:
 				archivefilename := os.Getenv("ZK_BACKYP_PREFIX") + "-" + time.Now().Format("20060102T150424") + ".tar.gz"
-				executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region, do_cleanup, zk_keep_n_snapshots)
+				executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region)
 
 			case <-quit:
 				ticker.Stop()
@@ -60,57 +58,67 @@ func main() {
 	select {} // block forever
 }
 
-func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilename string, s3_bucket string, region aws.Region, cleanup bool, zk_keep_n_snapshots string) {
+func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilename string, s3_bucket string, region aws.Region) {
 	var err error = nil
-	if cleanup {
-		log.Println("Cleaning up")
-		err := doCleanup(zk_txlog_path, zk_snapshot_path, zk_keep_n_snapshots)
 
+	log.Println("Executing Backup")
+
+	leader, err := isLeader()
+	if(leader){
+		log.Println("Backup omitted, this zookeeper is leader")
+	}
+	else{
+		// STOPPING ZOOKEEPER
+		err = stopZookeeper()
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		// COMPRESS SNAPSHOTS AND TX LOGS
+		if zk_txlog_path == zk_snapshot_path {
+			err = tar(archivefilename, []string{zk_txlog_path})
+		} else {
+			err = tar(archivefilename, []string{zk_txlog_path, zk_snapshot_path})
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// STARTING ZOOKEEPER
+		err = startZookeeper()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// UPLOADING BACKUP TO S3
+		err = uploadToS3(archivefilename, s3_bucket, region)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = deleteFile(archivefilename)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Println("Backup successfully done")
 	}
 
-	log.Println("Executing Backup")
-	// STOPPING ZOOKEEPER
-	err = stopZookeeper()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// COMPRESS SNAPSHOTS AND TX LOGS
-	if zk_txlog_path == zk_snapshot_path {
-		err = tar(archivefilename, []string{zk_txlog_path})
-	} else {
-		err = tar(archivefilename, []string{zk_txlog_path, zk_snapshot_path})
-	}
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// STARTING ZOOKEEPER
-	err = startZookeeper()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// UPLOADING BACKUP TO S3
-	err = uploadToS3(archivefilename, s3_bucket, region)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = deleteFile(archivefilename)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("Backup successfully done")
 }
 
-func doCleanup(zk_txlog_path string, zk_snapshot_path string, zk_keep_n_snapshots string) error {
-	err := exec.Command("/var/vcap/packages/zk-backyp/zk-cleanup.sh", zk_txlog_path, zk_snapshot_path, zk_keep_n_snapshots).Run()
-	return err
+func isLeader() (zk_leader bool, err error) {
+	log.Println("Checking mode...")
+	out, zk_err := exec.Command("echo", "stat", "|", "nc", "localhost", "2181", "|", "grep", "Mode").Output()
+
+	if zk_err != nil {
+		return false, zk_err
+	}
+
+	log.Printf("Found %s \n", out)
+	if strings.Contains(string(out[:]),"leader") {
+		return true, nil
+	}
+	return false, nil
 }
 
 func stopZookeeper() error {
