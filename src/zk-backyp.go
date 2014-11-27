@@ -66,8 +66,7 @@ func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilenam
 	leader, err := isLeader()
 	if(leader){
 		log.Println("Backup omitted, this zookeeper is leader")
-	}
-	else{
+	}else{
 		// STOPPING ZOOKEEPER
 		err = stopZookeeper()
 		if err != nil {
