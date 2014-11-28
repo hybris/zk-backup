@@ -60,6 +60,7 @@ func main() {
 
 func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilename string, s3_bucket string, region aws.Region) {
 	var err error = nil
+	var leader bool = true
 
 	log.Println("Executing Backup")
 
