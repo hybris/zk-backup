@@ -63,7 +63,7 @@ func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilenam
 
 	log.Println("Executing Backup")
 
-	leader, err := isLeader()
+	leader, err = isLeader()
 	if(leader){
 		log.Println("Backup omitted, this zookeeper is leader")
 	}else{
