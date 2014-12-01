@@ -110,42 +110,38 @@ func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilenam
 
 func isLeader() (zk_leader bool) {
 	log.Println("Checking mode...")
-	c1 := exec.Command("echo", "stat")
-	c2 := exec.Command("nc", "localhost", "2181")
-	r, w := io.Pipe()
-	c1.Stdout = w
-	c2.Stdin = r
+	echoCommand := exec.Command("echo", "stat")
+	ncCommand := exec.Command("nc", "localhost", "2181")
+	pipeReader, pipeWriter := io.Pipe()
+	echoCommand.Stdout = pipeWriter
+	ncCommand.Stdin = pipeReader
 
-	var b2 bytes.Buffer
-	c2.Stdout = &b2
+	var resultBuffer bytes.Buffer
+	ncCommand.Stdout = &resultBuffer
 
-	err1 := c1.Start()
-	if err1 != nil {
-		log.Fatal(err1)
+	errEchoCommand := echoCommand.Start()
+	if errEchoCommand != nil {
+		log.Fatal(errEchoCommand)
 	}
 
-	err2 := c2.Start()
-	if err2 != nil {
-		log.Fatal(err2)
+	errNcCommand := ncCommand.Start()
+	if errNcCommand != nil {
+		log.Fatal(errNcCommand)
 	}
 
-	err1 = c1.Wait()
-	if err1 != nil {
-		log.Printf("Command 'echo stat' finished with error: %v", err1)
+	errEchoCommand = echoCommand.Wait()
+	if errEchoCommand != nil {
+		log.Printf("Command 'echo stat' finished with error: %v", errEchoCommand)
 	}
-	w.Close()
-	err2 = c2.Wait()
+	pipeWriter.Close()
+	errNcCommand = ncCommand.Wait()
 
-	if err2 != nil {
-		log.Printf("Command 'nc localhost 2181' finished with error: %v", err2)
+	if errNcCommand != nil {
+		log.Printf("Command 'nc localhost 2181' finished with error: %v", errNcCommand)
 	}
-	log.Printf("RESULT: \n %s \n", &b2)
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(&b2)
-	s := buf.String()
-
-	if strings.Contains(s,"leader") {
+	log.Printf("RESULT: \n %s \n", &resultBuffer)
+	
+	if strings.Contains(resultBuffer.String(),"leader") {
 		return true
 	}else{
 		return false
