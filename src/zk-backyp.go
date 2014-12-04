@@ -62,13 +62,13 @@ func main() {
 
 func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilename string, s3_bucket string, region aws.Region) {
 	var err error = nil
-	var leader bool = true
+	var follower bool = false
 
 	log.Println("Executing Backup")
 
-	leader = isLeader()
-	if(leader){
-		log.Println("Backup omitted, this zookeeper is leader")
+	follower = isFollower()
+	if(!follower){
+		log.Println("Backup omitted, this zookeeper is not follower")
 	}else{
 		// STOPPING ZOOKEEPER
 		err = stopZookeeper()
@@ -108,7 +108,7 @@ func executeBackup(zk_txlog_path string, zk_snapshot_path string, archivefilenam
 
 }
 
-func isLeader() (zk_leader bool) {
+func isFollower() bool {
 	log.Println("Checking mode...")
 	echoCommand := exec.Command("echo", "stat")
 	ncCommand := exec.Command("nc", "localhost", "2181")
@@ -122,26 +122,30 @@ func isLeader() (zk_leader bool) {
 	errEchoCommand := echoCommand.Start()
 	if errEchoCommand != nil {
 		log.Fatal(errEchoCommand)
+		return false
 	}
 
 	errNcCommand := ncCommand.Start()
 	if errNcCommand != nil {
 		log.Fatal(errNcCommand)
+		return false
 	}
 
 	errEchoCommand = echoCommand.Wait()
 	if errEchoCommand != nil {
 		log.Printf("Command 'echo stat' finished with error: %v", errEchoCommand)
+		return false
 	}
 	pipeWriter.Close()
 	errNcCommand = ncCommand.Wait()
 
 	if errNcCommand != nil {
 		log.Printf("Command 'nc localhost 2181' finished with error: %v", errNcCommand)
+		return false
 	}
 	log.Printf("RESULT: \n %s \n", &resultBuffer)
-	
-	if strings.Contains(resultBuffer.String(),"leader") {
+
+	if strings.Contains(resultBuffer.String(),"follower") {
 		return true
 	}else{
 		return false
