@@ -16,11 +16,11 @@ import (
 )
 
 func main() {
-	log.Println("ZOOKEEPER BACKYP DAEMON started")
+	log.Println("ZOOKEEPER BACKUP DAEMON started")
 	// GETTING ENV VARS
-	backup_interval := os.Getenv("ZK_BACKYP_INTERVAL")
-	s3_bucket := os.Getenv("ZK_BACKYP_S3_BUCKET")
-	s3_endpoint := os.Getenv("ZK_BACKYP_S3_ENDPOINT")
+	backup_interval := os.Getenv("ZK_BACKUP_INTERVAL")
+	s3_bucket := os.Getenv("ZK_BACKUP_S3_BUCKET")
+	s3_endpoint := os.Getenv("ZK_BACKUP_S3_ENDPOINT")
 	zk_txlog_path := os.Getenv("ZK_TXLOG_PATH")
 	zk_snapshot_path := os.Getenv("ZK_SNAPSHOT_PATH")
 
@@ -34,13 +34,13 @@ func main() {
 	// LET THE BACKUP BEGIN!
 	interval, errIntv := strconv.ParseInt(backup_interval, 10, 64)
 	if errIntv != nil {
-		log.Fatal("Could not parse environment variable ZK_BACKYP_INTERVAL")
+		log.Fatal("Could not parse environment variable ZK_BACKUP_INTERVAL")
 	}
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	quit := make(chan struct{})
 
 	// execute one backup now
-	archivefilename := os.Getenv("ZK_BACKYP_PREFIX") + "-" + time.Now().Format("20060102T150424") + ".tar.gz"
+	archivefilename := os.Getenv("ZK_BACKUP_PREFIX") + "-" + time.Now().Format("20060102T150424") + ".tar.gz"
 	go executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region)
 
 	// execute the others later by interval
@@ -48,7 +48,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				archivefilename := os.Getenv("ZK_BACKYP_PREFIX") + "-" + time.Now().Format("20060102T150424") + ".tar.gz"
+				archivefilename := os.Getenv("ZK_BACKUP_PREFIX") + "-" + time.Now().Format("20060102T150424") + ".tar.gz"
 				executeBackup(zk_txlog_path, zk_snapshot_path, archivefilename, s3_bucket, region)
 
 			case <-quit:

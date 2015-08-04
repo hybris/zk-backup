@@ -6,7 +6,7 @@ VAGRANTFILE_API_VERSION = "2"
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.box = "https://cloud-images.ubuntu.com/vagrant/trusty/current/trusty-server-cloudimg-amd64-vagrant-disk1.box"
 
-  config.vm.synced_folder ".", "/zk-backyp"
+  config.vm.synced_folder ".", "/zk-backup"
   #config.vm.synced_folder "../../../bosh-environment", "/bosh-env"
 
   $script = <<SCRIPT
@@ -18,7 +18,7 @@ apt-get install -y git golang monit zookeeper openjdk-7-jre
 export GOPATH=~/.go/
 echo export GOPATH=~/.go/ >> ~/.bashrc
 
-cp /zk-backyp/test/monit            /etc/monit/conf.d/zookeeper
+cp /zk-backup/test/monit            /etc/monit/conf.d/zookeeper
 echo "set httpd port 2812 and"   >> /etc/monit/conf.d/httpd
 echo "    use address localhost" >> /etc/monit/conf.d/httpd
 echo "    allow localhost"       >> /etc/monit/conf.d/httpd
